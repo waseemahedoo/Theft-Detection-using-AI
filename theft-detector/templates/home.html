@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+
+{% block title %}Home{% endblock %}
+{% block content %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+          {% for category,message in messages %}
+              {% if category == 'error' %}
+                  <div class="alert alert-danger alter-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="close" data-dismiss="alert">
+                      <span aria-hidden="true">&times;</span>
+                  </button>
+                  </div>
+              {% else %}
+                  <div class="alert alert-success alter-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="close" data-dismiss="alert">
+                      <span aria-hidden="true">&times;</span>
+                  </button>
+                  </div>
+              {% endif %}
+          {% endfor %}
+      {% endif %}
+  {% endwith %}
+
+    <h1 style="text-align: center"> Dashboard</h1>
+    <h3> Welcome {{ user.first_name }}</h3>
+
+    <div class="col-lg-8">
+    </div>
+        <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Configure your recording</h5>
+
+              <!-- Horizontal Form -->
+              <form method="post">
+                <div class="row mb-3">
+                  <label for="inputEmail3" class="col-sm-2 col-form-label">Camera Type</label>
+                  <div class="col-sm-10">
+                    <select id="videoSource"></select>
+                  </div>
+                </div>
+                  <div class="row mb-3">
+                  <label for="inputEmail3" class="col-sm-2 col-form-label">Alert method(s)</label>
+                  </div>
+                 <div class="row">
+                  <div class="col-sm-10 offset-sm-2">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="gridCheck1">
+                      <label class="form-check-label" for="gridCheck1">
+                        Telegram Bot
+                      </label>
+                    </div>
+                  </div>
+                     <div class="col-sm-10 offset-sm-2">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="gridCheck2">
+                      <label class="form-check-label" for="gridCheck1">
+                        Email Address
+                      </label>
+                    </div>
+                  </div>
+                <div class="text-center" style="position:relative">
+                    <div id="stream-controls">
+                        <div class="event-box">
+                            <span id="event-text">Message</span>
+                        </div>
+                        <div class="buttons-group">
+                            <button type="button" class="btn btn-primary" onclick="startStream()">Start video stream</button>
+                            <button type="button" class="btn btn-danger" onclick="stopStream()">Stop video stream</button>
+                        </div>
+                    </div>
+
+                        <video id="video" width="800" height="600" style="position: absolute;" autoplay></video>
+                        <canvas id="captureCanvas" width="800" height="600" style="display:None;position:
+                        absolute;top: 0; left: 0;"></canvas>
+                        <canvas id="rectangleCanvas" width="800" height="600" style="z-index: 0;pointer-events:
+                        None; position: absolute;top: 58px; left: 10px; right: 10px;"></canvas>
+
+                    {#<button type="reset" class="btn btn-secondary">Reset</button>#}
+                </div>
+                  </div>
+              </form><!-- End Horizontal Form -->
+
+            </div>
+          </div>
+    <script>
+
+        var videoElement = document.querySelector('video');
+        videoElement.style.display = "none";
+        var videoSelect = document.querySelector('select#videoSource');
+        var eventText = document.querySelector("#event-text");
+        var canvasElement = document.querySelector('#captureCanvas');
+        var rectangleElement = document.querySelector('#rectangleCanvas');
+        var rectangleContext = rectangleElement.getContext('2d');
+        eventText.textContent = "Surveillance deactivated";
+        document.getElementById("stream-controls").getElementsByClassName("btn-danger")[0].style.display = "none";
+        let checkInterval = null;
+        var context = canvasElement.getContext('2d');
+
+        {#var left,right,bottom,top#}
+
+        navigator.mediaDevices.enumerateDevices()
+        .then(gotDevices)
+        .catch(handleError);
+
+        videoSelect.onchange = getStream;
+
+        function captureFrame() {
+            var telegram = false
+            var email = false
+            var checkBox1 = document.getElementById('gridCheck1');
+            var checkBox2 = document.getElementById('gridCheck2');
+
+            if (checkBox1.checked) {
+                telegram = true
+
+            }
+            if (checkBox2.checked) {
+                email = true
+            }
+
+            var context = canvasElement.getContext('2d');
+            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            var imgData = canvasElement.toDataURL('image/png');
+            var rectangleContext = rectangleElement.getContext('2d');
+            console.log(rectangleContext)
+            rectangleContext.clearRect(0, 0, rectangleElement.width, rectangleElement.height);
+
+            jQuery.ajax({
+                type: 'POST',
+                url: '/check-image',
+                data: {
+                    image: imgData,
+                    telegram: telegram,
+                    email: email
+                }
+            })
+            .done(function (data) {
+                var matches = data.matches
+                var left = data.left;
+                var top = data.top;
+                var bottom = data.bottom;
+                var right = data.right;
+                var detections = data.detections;
+                var out_counter = data.out
+                var message = data.data
+
+                if(matches === "true"){
+                    // Set the stroke color to green
+                    rectangleContext.strokeStyle = 'green';
+                    rectangleContext.lineWidth = "4";
+                    rectangleContext.font = "10 px Arial";
+                    rectangleContext.fillStyle = "green";
+
+                    // Draw a new rectangle
+
+                    rectangleContext.beginPath();
+                    rectangleContext.rect(left, top, right - left, bottom - top);
+                    {#rectangleContext.rect(left, top, right - left, bottom - top);#}
+                    rectangleContext.stroke();
+                    rectangleContext.fillText("Owner",left,top -3)
+                    // Stroke it (Do the Drawing)
+                    rectangleContext.stroke();
+
+                } else {
+                    eventText.textContent = "Surveillance activated, current status: " + message;
+
+                    // Set the stroke color to green
+                    rectangleContext.strokeStyle = 'red';
+                    rectangleContext.lineWidth = "4";
+                    rectangleContext.font = "10 px Arial";
+                    rectangleContext.fillStyle = "red";
+
+                    // Draw a new rectangle
+
+                    rectangleContext.beginPath();
+                    rectangleContext.rect(left, top, right - left, bottom - top);
+                    rectangleContext.moveTo(200,720);
+                    rectangleContext.lineTo(200,0);
+                    {#rectangleContext.rect(left, top, right - left, bottom - top);#}
+                    rectangleContext.stroke();
+                    rectangleContext.fillText("Intruder",left,top -3)
+
+                    rectangleContext.font = "50 px Arial";
+                    rectangleContext.fillStyle = "black";
+                    rectangleContext.fillText("Out:" + out_counter,205,100)
+
+
+                    for (var i = 0; i < detections.length; i++) {
+                        var detection = detections[i];
+                        var xyxy = detection.xyxy;
+                        var confidence = detection.confidence;
+                        var class_id = detection.class_id;
+                        var label = detection.label;
+
+                        rectangleContext.strokeStyle = 'blue';
+                        rectangleContext.lineWidth = "4";
+                        rectangleContext.font = "10 px Arial";
+                        rectangleContext.fillStyle = "blue";
+
+                        // Draw a new rectangle
+
+                        rectangleContext.beginPath();
+                        rectangleContext.rect(xyxy[0], xyxy[1], xyxy[2] - xyxy[0], (xyxy[3]) - xyxy[1]);
+                        {#rectangleContext.rect(left, top, right - left, bottom - top);#}
+                        rectangleContext.stroke();
+                        rectangleContext.fillText(label,xyxy[0],xyxy[1] - 3)
+
+
+
+        console.log('Detection ' + i + ':', xyxy, confidence, class_id, label);
+    }
+                }
+
+
+            })
+            .fail(function (jqXHR, textStatus, errorThrown) {
+                console.error('Request failed: ' + textStatus);
+            })
+        }
+
+        function gotDevices(deviceInfos) {
+            for (var i = 0; i !== deviceInfos.length; ++i) {
+                var deviceInfo = deviceInfos[i];
+                var option = document.createElement('option');
+                option.value = deviceInfo.deviceId;
+                if (deviceInfo.kind === 'videoinput') {
+                    option.text = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
+                    videoSelect.appendChild(option);
+                }
+            }
+        }
+
+        function stopStream() {
+            rectangleContext.clearRect(0, 0, rectangleElement.width, rectangleElement.height);
+
+            clearInterval(checkInterval);
+            if (window.stream) {
+                window.stream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+            }
+            videoElement.style.display = "none";
+            document.getElementById("stream-controls").getElementsByClassName("btn-primary")[0].style.display = "";
+            document.getElementById("stream-controls").getElementsByClassName("btn-danger")[0].style.display = "none";
+            eventText.textContent = "Surveillance deactivated";
+        }
+
+        function startStream() {
+            videoElement.style.display = "block";
+            document.getElementById("stream-controls").getElementsByClassName("btn-primary")[0].style.display = "none";
+            document.getElementById("stream-controls").getElementsByClassName("btn-danger")[0].style.display = "";
+            eventText.textContent = "Surveillance activated : all normal";
+            getStream()
+        }
+
+        function getStream() {
+            if (window.stream) {
+                window.stream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+            }
+
+           var constraints = {
+            video: {
+            deviceId: {exact: videoSelect.value},
+            width: {exact: 800},
+            height: {exact: 600}
+            }
+        };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+            .then(gotStream)
+            .catch(handleError);
+        }
+
+        function gotStream(stream) {
+            window.stream = stream; // make stream available to console
+            videoElement.srcObject = stream;
+            checkInterval = setInterval(captureFrame, 3000);
+        }
+
+        function handleError(error) {
+            console.log('Error: ', error);
+        }
+    </script>
+{% endblock %}

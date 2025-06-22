@@ -1,0 +1,7 @@
+.env
+/models/
+models/**
+mdoels/*
+/theft-detector/static/
+/theft-detector/static/*
+/theft-detector/static/**
