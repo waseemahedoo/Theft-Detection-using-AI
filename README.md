@@ -70,7 +70,7 @@ Place the following files in the models/ folder:
 shape_predictor_68_face_landmarks.dat
 dlib_face_recognition_resnet_model_v1.dat
 ```
-7.**Run app**
+7. **Run app**
 ```bash
 flask run
 ```
