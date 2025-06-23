@@ -12,7 +12,7 @@ The system uses face recognition library by OpenCV to perform face detection and
 
 - Real-time face recognition using `dlib` + `face_recognition`
 - Object detection and tracking with `YOLOv8` and `Supervision`
-- Telegram & email alert system for emergency detection (e.g. weapons)
+- Telegram & email alert system for emergency detection 
 - User session management with Flask-Login
 - Image logging and storage with timestamping
 - SQLite database integration via SQLAlchemy and Flask-Migrate
